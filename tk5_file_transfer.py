@@ -215,7 +215,7 @@ class FtpFiles:
             self.ftp.cwd(path)
             lines: list[str] = []
             self.ftp.retrlines("LIST", lines.append)
-            entries = []
+            entries_by_name: dict[str, dict[str, str]] = {}
             for line in lines:
                 if not line or line.lower().startswith("total "):
                     continue
@@ -227,13 +227,16 @@ class FtpFiles:
                     updated = datetime.strptime(" ".join(fields[5:8]), "%b %d %Y").date().isoformat()
                 except ValueError:
                     updated = ""
-                entries.append({
+                entry = {
                     "name": name,
                     "kind": "dir" if fields[0].startswith("d") else "file",
                     "size": fields[4],
                     "updated": updated,
-                })
-            return sorted(entries, key=lambda entry: (entry["kind"] != "dir", entry["name"].casefold()))
+                }
+                previous = entries_by_name.get(name)
+                if previous is None or entry["kind"] == "dir":
+                    entries_by_name[name] = entry
+            return sorted(entries_by_name.values(), key=lambda entry: (entry["kind"] != "dir", entry["name"].casefold()))
         finally:
             self.ftp.cwd(original)
 

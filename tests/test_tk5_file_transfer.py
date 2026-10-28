@@ -2,6 +2,7 @@ import tempfile
 import sys
 import unittest
 from pathlib import Path
+from unittest.mock import Mock
 
 sys.dont_write_bytecode = True
 test_directory = Path(__file__).resolve().parent
@@ -346,6 +347,17 @@ class FtpTransferTests(unittest.TestCase):
         self.assertEqual([(entry["name"], entry["kind"]) for entry in entries], [("SOURCE", "dir"), ("HELLO", "file")])
         self.assertEqual(entries[1]["size"], "6")
         self.assertEqual(entries[1]["updated"], "2026-01-01")
+
+    def test_remote_list_ignores_duplicate_names(self) -> None:
+        ftp = Mock()
+        ftp.pwd.return_value = "/"
+        file_row = "-r-xr-xr-x 1 USER GROUP 0 Jan 01 2026 IBP.DEV.BCOB"
+        directory_row = "dr-xr-xr-x 1 USER GROUP 0 Jan 01 2026 IBP.DEV.BCOB"
+        ftp.retrlines.side_effect = lambda _command, callback: (callback(file_row), callback(directory_row))
+
+        entries = FtpFiles(ftp).list_dir("/")
+
+        self.assertEqual([(entry["name"], entry["kind"]) for entry in entries], [("IBP.DEV.BCOB", "dir")])
 
     def test_remote_filter_matches_dataset_middle_across_hlqs(self) -> None:
         entries = [
